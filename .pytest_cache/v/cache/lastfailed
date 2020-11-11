@@ -1,0 +1,14 @@
+{
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item10]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item11]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item13]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item14]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item15]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item16]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item17]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item18]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item6]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item7]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item8]": true,
+  "testcase/test_usedCar.py::TestCase::test_usedCar_collection[item9]": true
+}
