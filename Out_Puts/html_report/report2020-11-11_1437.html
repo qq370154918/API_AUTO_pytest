@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title>Test Report</title>
+    <link href="assets/style.css" rel="stylesheet" type="text/css"/></head>
+  <body onLoad="init()">
+    <script>/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+
+function toArray(iter) {
+    if (iter === null) {
+        return null;
+    }
+    return Array.prototype.slice.call(iter);
+}
+
+function find(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return elem.querySelector(selector);
+}
+
+function find_all(selector, elem) {
+    if (!elem) {
+        elem = document;
+    }
+    return toArray(elem.querySelectorAll(selector));
+}
+
+function sort_column(elem) {
+    toggle_sort_states(elem);
+    var colIndex = toArray(elem.parentNode.childNodes).indexOf(elem);
+    var key;
+    if (elem.classList.contains('numeric')) {
+        key = key_num;
+    } else if (elem.classList.contains('result')) {
+        key = key_result;
+    } else {
+        key = key_alpha;
+    }
+    sort_table(elem, key(colIndex));
+}
+
+function show_all_extras() {
+    find_all('.col-result').forEach(show_extras);
+}
+
+function hide_all_extras() {
+    find_all('.col-result').forEach(hide_extras);
+}
+
+function show_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.remove("collapsed");
+    expandcollapse.classList.remove("expander");
+    expandcollapse.classList.add("collapser");
+}
+
+function hide_extras(colresult_elem) {
+    var extras = colresult_elem.parentNode.nextElementSibling;
+    var expandcollapse = colresult_elem.firstElementChild;
+    extras.classList.add("collapsed");
+    expandcollapse.classList.remove("collapser");
+    expandcollapse.classList.add("expander");
+}
+
+function show_filters() {
+    var filter_items = document.getElementsByClassName('filter');
+    for (var i = 0; i < filter_items.length; i++)
+        filter_items[i].hidden = false;
+}
+
+function add_collapse() {
+    // Add links for show/hide all
+    var resulttable = find('table#results-table');
+    var showhideall = document.createElement("p");
+    showhideall.innerHTML = '<a href="javascript:show_all_extras()">Show all details</a> / ' +
+                            '<a href="javascript:hide_all_extras()">Hide all details</a>';
+    resulttable.parentElement.insertBefore(showhideall, resulttable);
+
+    // Add show/hide link to each result
+    find_all('.col-result').forEach(function(elem) {
+        var collapsed = get_query_parameter('collapsed') || 'Passed';
+        var extras = elem.parentNode.nextElementSibling;
+        var expandcollapse = document.createElement("span");
+        if (extras.classList.contains("collapsed")) {
+            expandcollapse.classList.add("expander")
+        } else if (collapsed.includes(elem.innerHTML)) {
+            extras.classList.add("collapsed");
+            expandcollapse.classList.add("expander");
+        } else {
+            expandcollapse.classList.add("collapser");
+        }
+        elem.appendChild(expandcollapse);
+
+        elem.addEventListener("click", function(event) {
+            if (event.currentTarget.parentNode.nextElementSibling.classList.contains("collapsed")) {
+                show_extras(event.currentTarget);
+            } else {
+                hide_extras(event.currentTarget);
+            }
+        });
+    })
+}
+
+function get_query_parameter(name) {
+    var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+    return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
+}
+
+function init () {
+    reset_sort_headers();
+
+    add_collapse();
+
+    show_filters();
+
+    sort_column(find('.initial-sort'));
+
+    find_all('.sortable').forEach(function(elem) {
+        elem.addEventListener("click",
+                              function(event) {
+                                  sort_column(elem);
+                              }, false)
+    });
+
+};
+
+function sort_table(clicked, key_func) {
+    var rows = find_all('.results-table-row');
+    var reversed = !clicked.classList.contains('asc');
+    var sorted_rows = sort(rows, key_func, reversed);
+    /* Whole table is removed here because browsers acts much slower
+     * when appending existing elements.
+     */
+    var thead = document.getElementById("results-table-head");
+    document.getElementById('results-table').remove();
+    var parent = document.createElement("table");
+    parent.id = "results-table";
+    parent.appendChild(thead);
+    sorted_rows.forEach(function(elem) {
+        parent.appendChild(elem);
+    });
+    document.getElementsByTagName("BODY")[0].appendChild(parent);
+}
+
+function sort(items, key_func, reversed) {
+    var sort_array = items.map(function(item, i) {
+        return [key_func(item), i];
+    });
+
+    sort_array.sort(function(a, b) {
+        var key_a = a[0];
+        var key_b = b[0];
+
+        if (key_a == key_b) return 0;
+
+        if (reversed) {
+            return (key_a < key_b ? 1 : -1);
+        } else {
+            return (key_a > key_b ? 1 : -1);
+        }
+    });
+
+    return sort_array.map(function(item) {
+        var index = item[1];
+        return items[index];
+    });
+}
+
+function key_alpha(col_index) {
+    return function(elem) {
+        return elem.childNodes[1].childNodes[col_index].firstChild.data.toLowerCase();
+    };
+}
+
+function key_num(col_index) {
+    return function(elem) {
+        return parseFloat(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function key_result(col_index) {
+    return function(elem) {
+        var strings = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed',
+                       'Skipped', 'Passed'];
+        return strings.indexOf(elem.childNodes[1].childNodes[col_index].firstChild.data);
+    };
+}
+
+function reset_sort_headers() {
+    find_all('.sort-icon').forEach(function(elem) {
+        elem.parentNode.removeChild(elem);
+    });
+    find_all('.sortable').forEach(function(elem) {
+        var icon = document.createElement("div");
+        icon.className = "sort-icon";
+        icon.textContent = "vvv";
+        elem.insertBefore(icon, elem.firstChild);
+        elem.classList.remove("desc", "active");
+        elem.classList.add("asc", "inactive");
+    });
+}
+
+function toggle_sort_states(elem) {
+    //if active, toggle between asc and desc
+    if (elem.classList.contains('active')) {
+        elem.classList.toggle('asc');
+        elem.classList.toggle('desc');
+    }
+
+    //if inactive, reset all other functions and add ascending active
+    if (elem.classList.contains('inactive')) {
+        reset_sort_headers();
+        elem.classList.remove('inactive');
+        elem.classList.add('active');
+    }
+}
+
+function is_all_rows_hidden(value) {
+  return value.hidden == false;
+}
+
+function filter_table(elem) {
+    var outcome_att = "data-test-result";
+    var outcome = elem.getAttribute(outcome_att);
+    class_outcome = outcome + " results-table-row";
+    var outcome_rows = document.getElementsByClassName(class_outcome);
+
+    for(var i = 0; i < outcome_rows.length; i++){
+        outcome_rows[i].hidden = !elem.checked;
+    }
+
+    var rows = find_all('.results-table-row').filter(is_all_rows_hidden);
+    var all_rows_hidden = rows.length == 0 ? true : false;
+    var not_found_message = document.getElementById("not-found-message");
+    not_found_message.hidden = !all_rows_hidden;
+}
+</script>
+    <h1>report2020-11-11_1437.html</h1>
+    <p>Report generated on 11-Nov-2020 at 14:37:13 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a> v2.1.1</p>
+    <h2>Environment</h2>
+    <table id="environment">
+      <tr>
+        <td>JAVA_HOME</td>
+        <td>C:\Program Files\Java\jdk1.8.0_201</td></tr>
+      <tr>
+        <td>Packages</td>
+        <td>{"pluggy": "0.13.1", "py": "1.8.1", "pytest": "5.4.3"}</td></tr>
+      <tr>
+        <td>Platform</td>
+        <td>Windows-10-10.0.18362-SP0</td></tr>
+      <tr>
+        <td>Plugins</td>
+        <td>{"allure-pytest": "2.8.16", "cov": "2.6.1", "forked": "1.1.3", "html": "2.1.1", "metadata": "1.8.0", "rerunfailures": "7.0", "xdist": "1.32.0"}</td></tr>
+      <tr>
+        <td>Python</td>
+        <td>3.7.2</td></tr></table>
+    <h2>Summary</h2>
+    <p>7 tests ran in 4.84 seconds. </p>
+    <p class="filter" hidden="true">(Un)check the boxes to filter the results.</p><input checked="true" class="filter" data-test-result="passed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="passed">0 passed</span>, <input checked="true" class="filter" data-test-result="skipped" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="skipped">0 skipped</span>, <input checked="true" class="filter" data-test-result="failed" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="failed">7 failed</span>, <input checked="true" class="filter" data-test-result="error" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="error">0 errors</span>, <input checked="true" class="filter" data-test-result="xfailed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xfailed">0 expected failures</span>, <input checked="true" class="filter" data-test-result="xpassed" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="xpassed">0 unexpected passes</span>, <input checked="true" class="filter" data-test-result="rerun" disabled="true" hidden="true" name="filter_checkbox" onChange="filter_table(this)" type="checkbox"/><span class="rerun">0 rerun</span>
+    <h2>Results</h2>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable result initial-sort" col="result">Result</th>
+          <th class="sortable" col="name">Test</th>
+          <th class="sortable numeric" col="duration">Duration</th>
+          <th>Links</th></tr>
+        <tr hidden="true" id="not-found-message">
+          <th colspan="4">No results found. Try to check the filters</th></tr></thead>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">testcase/test_usedCar.py::TestCase::test_usedCar_collection[item0]</td>
+          <td class="col-duration">0.05</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_usedCar.TestCase object at 0x0000027E65A10F28&gt;<br/>item = {&#x27;case_id&#x27;: 1, &#x27;contentType&#x27;: None, &#x27;data&#x27;: &#x27;{&quot;plate_number&quot;: &quot;粤CWQ0LZ&quot;,&quot;vin&quot;: &quot;089MTUF334HC51XSA&quot;,&quot;jzg_car_model_id&quot;:...e&quot;: &quot;李晓良&quot;,&quot;from_employee_id&quot;: &quot;1817&quot;,&quot;note&quot;: &quot;备注内容&quot;,&quot;district&quot;: &quot;南山区&quot;,&quot;district_code&quot;: &quot;440305&quot; }&#x27;, &#x27;excepted&#x27;: 0, ...}<br/>do_login = &lt;requests.sessions.Session object at 0x0000027E6ECFA9E8&gt;<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, (test_data))<br/>    def test_usedCar_collection(self,item,do_login):<br/>        headers = {}<br/>        print(&quot;用例名称：{}&quot;.format(item[&quot;title&quot;]))<br/>        # print(&quot;car_id:{}&quot;.format(getattr(GetData,&#x27;car_id&#x27;)))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到car_id替换${car_id}&#x27;&#x27;&#x27;<br/>            item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_id}&#x27;,getattr(GetData,&#x27;car_id&#x27;))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_info_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到{car_info_id}替换#{car_info_id}&#x27;&#x27;&#x27;<br/>            item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_info_id}&#x27;,getattr(GetData,&#x27;car_info_id&#x27;))<br/>        if item[&#x27;data&#x27;].find(&#x27;${car_num}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到车牌号替换${car_num}&#x27;&#x27;&#x27;<br/>            item[&#x27;data&#x27;]=item[&#x27;data&#x27;].replace(&#x27;${car_num}&#x27;,getattr(GetData,&#x27;car_num&#x27;))<br/>        else:<br/>            pass<br/>        d = eval(item[&quot;data&quot;])<br/>        print(&quot;url:{}&quot;.format(item[&#x27;url&#x27;]))<br/>        #如果参数类型是json，要在header里加上“Content-Type：application/json”，并且要对data进行处理<br/>        if item[&#x27;contentType&#x27;]==&#x27;json&#x27;:<br/>            headers[&quot;Content-Type&quot;] = &quot;application/json; charset=UTF-8&quot;<br/>            d=json.dumps(eval(item[&quot;data&quot;]))<br/>            res = HttpResuest.http_request(url=item[&#x27;url&#x27;], data=d, method=item[&#x27;method&#x27;], headers=headers,s=do_login)<br/>            #请求结束后删除headers里面的Content-Type,因为后续接口的传参格式不一定是json<br/>            del headers[&quot;Content-Type&quot;]<br/>    <br/>        else:<br/>            res = HttpResuest.http_request(url=item[&#x27;url&#x27;], data=d, method=item[&#x27;method&#x27;], headers=headers,s=do_login)<br/>        r = json.loads(res.text)  # 将response格式转化为python字典格式<br/>        print(&quot;code:{}&quot;.format(r[&quot;code&quot;]),&quot;message:{}&quot;.format(r[&quot;message&quot;]))<br/>        if item[&#x27;title&#x27;]==&#x27;新建线索&#x27;:<br/>            &#x27;&#x27;&#x27;将新建线索生成的车辆id保存，用于下一个接口查询car_id&#x27;&#x27;&#x27;<br/>&gt;           car_id=r[&quot;data&quot;][&quot;id&quot;]<br/><span class="error">E           KeyError: &#x27;data&#x27;</span><br/><br/>testcase\test_usedCar.py:49: KeyError<br/> -------------------------------Captured log call-------------------------------- <br/>INFO     test_logs:my_log.py:23 接口https://q.test.dos.lixinchuxing.cn/api/v1/used_car/tickets的请求参数是：{&#x27;plate_number&#x27;: &#x27;粤CWQ0LZ&#x27;, &#x27;vin&#x27;: &#x27;089MTUF334HC51XSA&#x27;, &#x27;jzg_car_model_id&#x27;: &#x27;1261&#x27;, &#x27;jzg_car_model_name&#x27;: &#x27;宝马 5系 2005款 3.0L 自动 530Li&#x27;, &#x27;license_issued_on&#x27;: &#x27;2019-08-16&#x27;, &#x27;owner_name&#x27;: &#x27;接口测试数据&#x27;, &#x27;owner_mobile&#x27;: &#x27;13163750276&#x27;, &#x27;mileage&#x27;: &#x27;111111&#x27;, &#x27;jzg_color_id&#x27;: &#x27;1&#x27;, &#x27;transfer_count&#x27;: &#x27;0&#x27;, &#x27;province_code&#x27;: &#x27;440000&#x27;, &#x27;province&#x27;: &#x27;广东省&#x27;, &#x27;city_code&#x27;: &#x27;440300&#x27;, &#x27;city&#x27;: &#x27;深圳市&#x27;, &#x27;channel&#x27;: &#x27;1&#x27;, &#x27;replace_detail&#x27;: &#x27;1&#x27;, &#x27;from_employee_name&#x27;: &#x27;李晓良&#x27;, &#x27;from_employee_id&#x27;: &#x27;1817&#x27;, &#x27;note&#x27;: &#x27;备注内容&#x27;, &#x27;district&#x27;: &#x27;南山区&#x27;, &#x27;district_code&#x27;: &#x27;440305&#x27;}
+INFO     test_logs:my_log.py:23 接口https://q.test.dos.lixinchuxing.cn/api/v1/used_car/tickets的请求结果是：{
+  &quot;code&quot;: 401, 
+  &quot;message&quot;: &quot;用户未登录&quot;
+}<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">testcase/test_usedCar.py::TestCase::test_usedCar_collection[item1]</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_usedCar.TestCase object at 0x0000027E6EB769E8&gt;<br/>item = {&#x27;case_id&#x27;: 2, &#x27;contentType&#x27;: None, &#x27;data&#x27;: &#x27;{&quot;is_from_car_manage&quot;: &quot;false&quot;}&#x27;, &#x27;excepted&#x27;: 0, ...}<br/>do_login = &lt;requests.sessions.Session object at 0x0000027E6ECFA9E8&gt;<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, (test_data))<br/>    def test_usedCar_collection(self,item,do_login):<br/>        headers = {}<br/>        print(&quot;用例名称：{}&quot;.format(item[&quot;title&quot;]))<br/>        # print(&quot;car_id:{}&quot;.format(getattr(GetData,&#x27;car_id&#x27;)))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到car_id替换${car_id}&#x27;&#x27;&#x27;<br/>&gt;           item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_id}&#x27;,getattr(GetData,&#x27;car_id&#x27;))<br/><span class="error">E           TypeError: replace() argument 2 must be str, not None</span><br/><br/>testcase\test_usedCar.py:24: TypeError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">testcase/test_usedCar.py::TestCase::test_usedCar_collection[item2]</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_usedCar.TestCase object at 0x0000027E6EB9F588&gt;<br/>item = {&#x27;case_id&#x27;: 3, &#x27;contentType&#x27;: &#x27;json&#x27;, &#x27;data&#x27;: &quot;{&#x27;vin&#x27;: &#x27;089MTUF334HC51XSA&#x27;, &#x27;car_model_id&#x27;: 1261, &#x27;car_model_name&#x27;: &#x27;宝...name&#x27;: &#x27;非营运&#x27;, &#x27;emission_standard&#x27;: 106, &#x27;emission_standard_name&#x27;: &#x27;国六&#x27;, &#x27;info_has_changes&#x27;: True}&quot;, &#x27;excepted&#x27;: 0, ...}<br/>do_login = &lt;requests.sessions.Session object at 0x0000027E6ECFA9E8&gt;<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, (test_data))<br/>    def test_usedCar_collection(self,item,do_login):<br/>        headers = {}<br/>        print(&quot;用例名称：{}&quot;.format(item[&quot;title&quot;]))<br/>        # print(&quot;car_id:{}&quot;.format(getattr(GetData,&#x27;car_id&#x27;)))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到car_id替换${car_id}&#x27;&#x27;&#x27;<br/>            item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_id}&#x27;,getattr(GetData,&#x27;car_id&#x27;))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_info_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到{car_info_id}替换#{car_info_id}&#x27;&#x27;&#x27;<br/>&gt;           item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_info_id}&#x27;,getattr(GetData,&#x27;car_info_id&#x27;))<br/><span class="error">E           TypeError: replace() argument 2 must be str, not None</span><br/><br/>testcase\test_usedCar.py:27: TypeError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">testcase/test_usedCar.py::TestCase::test_usedCar_collection[item3]</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_usedCar.TestCase object at 0x0000027E6EB8C630&gt;<br/>item = {&#x27;case_id&#x27;: 4, &#x27;contentType&#x27;: &#x27;json&#x27;, &#x27;data&#x27;: &quot;{&#x27;info&#x27;: {&#x27;config&#x27;: [{&#x27;group_name&#x27;: &#x27;basic&#x27;, &#x27;name&#x27;: &#x27;基本参数&#x27;, &#x27;params&#x27;: ...lue&#x27;: None}]}], &#x27;config_is_ready&#x27;: True, &#x27;procedure_is_ready&#x27;: False}, &#x27;info_has_changes&#x27;: False}&quot;, &#x27;excepted&#x27;: 0, ...}<br/>do_login = &lt;requests.sessions.Session object at 0x0000027E6ECFA9E8&gt;<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, (test_data))<br/>    def test_usedCar_collection(self,item,do_login):<br/>        headers = {}<br/>        print(&quot;用例名称：{}&quot;.format(item[&quot;title&quot;]))<br/>        # print(&quot;car_id:{}&quot;.format(getattr(GetData,&#x27;car_id&#x27;)))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到car_id替换${car_id}&#x27;&#x27;&#x27;<br/>            item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_id}&#x27;,getattr(GetData,&#x27;car_id&#x27;))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_info_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到{car_info_id}替换#{car_info_id}&#x27;&#x27;&#x27;<br/>&gt;           item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_info_id}&#x27;,getattr(GetData,&#x27;car_info_id&#x27;))<br/><span class="error">E           TypeError: replace() argument 2 must be str, not None</span><br/><br/>testcase\test_usedCar.py:27: TypeError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">testcase/test_usedCar.py::TestCase::test_usedCar_collection[item4]</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_usedCar.TestCase object at 0x0000027E6EBAC1D0&gt;<br/>item = {&#x27;case_id&#x27;: 5, &#x27;contentType&#x27;: &#x27;json&#x27;, &#x27;data&#x27;: &quot;{&#x27;info&#x27;: {&#x27;config&#x27;: [{&#x27;group_name&#x27;: &#x27;basic&#x27;, &#x27;name&#x27;: &#x27;基本参数&#x27;, &#x27;params&#x27;: ...&#x27;mentionFee&#x27;: &#x27;&#x27;, &#x27;proceduresSpend&#x27;: &#x27;1&#x27;}, &#x27;procedure_is_ready&#x27;: True}, &#x27;info_has_changes&#x27;: True}&quot;, &#x27;excepted&#x27;: 0, ...}<br/>do_login = &lt;requests.sessions.Session object at 0x0000027E6ECFA9E8&gt;<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, (test_data))<br/>    def test_usedCar_collection(self,item,do_login):<br/>        headers = {}<br/>        print(&quot;用例名称：{}&quot;.format(item[&quot;title&quot;]))<br/>        # print(&quot;car_id:{}&quot;.format(getattr(GetData,&#x27;car_id&#x27;)))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到car_id替换${car_id}&#x27;&#x27;&#x27;<br/>            item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_id}&#x27;,getattr(GetData,&#x27;car_id&#x27;))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_info_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到{car_info_id}替换#{car_info_id}&#x27;&#x27;&#x27;<br/>&gt;           item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_info_id}&#x27;,getattr(GetData,&#x27;car_info_id&#x27;))<br/><span class="error">E           TypeError: replace() argument 2 must be str, not None</span><br/><br/>testcase\test_usedCar.py:27: TypeError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">testcase/test_usedCar.py::TestCase::test_usedCar_collection[item5]</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_usedCar.TestCase object at 0x0000027E6EBAC0B8&gt;<br/>item = {&#x27;case_id&#x27;: 6, &#x27;contentType&#x27;: &#x27;json&#x27;, &#x27;data&#x27;: &quot;{&#x27;info_has_changes&#x27;: True, &#x27;images&#x27;: {&#x27;mask_left_front_image_url&#x27;: &#x27;htt...: &#x27;https://test-images-cdn.cheanjia.com/zhongsheng/vXbDDGGK8EwNU8xY5FrrjE.jpg&#x27;, &#x27;video_url&#x27;: &#x27;&#x27;}}&quot;, &#x27;excepted&#x27;: 0, ...}<br/>do_login = &lt;requests.sessions.Session object at 0x0000027E6ECFA9E8&gt;<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, (test_data))<br/>    def test_usedCar_collection(self,item,do_login):<br/>        headers = {}<br/>        print(&quot;用例名称：{}&quot;.format(item[&quot;title&quot;]))<br/>        # print(&quot;car_id:{}&quot;.format(getattr(GetData,&#x27;car_id&#x27;)))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到car_id替换${car_id}&#x27;&#x27;&#x27;<br/>            item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_id}&#x27;,getattr(GetData,&#x27;car_id&#x27;))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_info_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到{car_info_id}替换#{car_info_id}&#x27;&#x27;&#x27;<br/>&gt;           item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_info_id}&#x27;,getattr(GetData,&#x27;car_info_id&#x27;))<br/><span class="error">E           TypeError: replace() argument 2 must be str, not None</span><br/><br/>testcase\test_usedCar.py:27: TypeError<br/></div></td></tr></tbody>
+      <tbody class="failed results-table-row">
+        <tr>
+          <td class="col-result">Failed</td>
+          <td class="col-name">testcase/test_usedCar.py::TestCase::test_usedCar_collection[item6]</td>
+          <td class="col-duration">0.00</td>
+          <td class="col-links"></td></tr>
+        <tr>
+          <td class="extra" colspan="4">
+            <div class="log">self = &lt;test_usedCar.TestCase object at 0x0000027E6EB71080&gt;<br/>item = {&#x27;case_id&#x27;: 7, &#x27;contentType&#x27;: &#x27;json&#x27;, &#x27;data&#x27;: &quot;{&#x27;inspection&#x27;: {&#x27;head&#x27;: [{&#x27;id&#x27;: 1, &#x27;title&#x27;: [&#x27;正常&#x27;], &#x27;damageList&#x27;: [{&#x27;ke...ote&#x27;: &#x27;车底板&#x27;, &#x27;category&#x27;: [&#x27;skeletonDamage&#x27;], &#x27;defaultTitle&#x27;: [&#x27;正常&#x27;]}]}, &#x27;info_has_changes&#x27;: True}&quot;, &#x27;excepted&#x27;: 0, ...}<br/>do_login = &lt;requests.sessions.Session object at 0x0000027E6ECFA9E8&gt;<br/><br/>    @pytest.mark.parametrize(&#x27;item&#x27;, (test_data))<br/>    def test_usedCar_collection(self,item,do_login):<br/>        headers = {}<br/>        print(&quot;用例名称：{}&quot;.format(item[&quot;title&quot;]))<br/>        # print(&quot;car_id:{}&quot;.format(getattr(GetData,&#x27;car_id&#x27;)))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到car_id替换${car_id}&#x27;&#x27;&#x27;<br/>            item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_id}&#x27;,getattr(GetData,&#x27;car_id&#x27;))<br/>        if item[&#x27;url&#x27;].find(&#x27;#{car_info_id}&#x27;)!=-1:<br/>            &#x27;&#x27;&#x27;从反射里拿到{car_info_id}替换#{car_info_id}&#x27;&#x27;&#x27;<br/>&gt;           item[&#x27;url&#x27;]=item[&#x27;url&#x27;].replace(&#x27;#{car_info_id}&#x27;,getattr(GetData,&#x27;car_info_id&#x27;))<br/><span class="error">E           TypeError: replace() argument 2 must be str, not None</span><br/><br/>testcase\test_usedCar.py:27: TypeError<br/></div></td></tr></tbody></table></body></html>
