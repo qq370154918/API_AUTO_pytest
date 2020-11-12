@@ -71,7 +71,7 @@ def worker(queue):
         timenow = time.strftime("%Y-%m-%d_%H%M", time.localtime())
         # os.system(f"pytest -sv {queue.get()[1]} --reruns 3 --color=no"
         #           f"--html={os.path.join(REPORTS_DIR, 'report.html')}")
-        os.system(f"pytest -sv {queue.get()[1]} --html=Out_Puts/html_report/report{timenow}.html --alluredir=./allure-results")
+        os.system(f"python3 -m pytest -sv {queue.get()[1]} --html=Out_Puts/html_report/report{timenow}.html --alluredir=./allure-results")
 
 
 
