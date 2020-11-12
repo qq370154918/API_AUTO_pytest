@@ -1,7 +1,4 @@
 import pytest
-import sys
-from selenium import webdriver
-import time
 from tools.login_session import login
 
 #声明它是一个fixture
